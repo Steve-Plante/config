@@ -1,0 +1,33 @@
+# run after Fedora installation with btrfs subvolumes installed
+sudo nano /etc/dnf/dnf.conf # and add to end of the file ...
+max_parallel_downloads=10
+fastestmirror=True
+sudo dnf -y groupinstall "Development Tools"
+sudo dnf install btrfs-assistant python3-dnf-plugin-snapper inotify-tools
+sudo dnf history
+cat /etc/os-release
+# *** Use Btrfs-Assistant to configure automatic snapshots ***
+#  1. Open btrfs-assistant from the System menu
+#  2. Click on Snapper Settings tab.
+#  3. Click on Create New Config.
+#  4. Enter "root" into the Config name field.
+#  5. Check Snapper cleanup enabled and Snapper boot enabled.
+#  6. Click Apply systemd changes.
+#  7. Click Save.
+#  8. Under Snapshot Retention, disable timeline snapshots.
+#  9. Change "Number Save:" to 10.
+# 10. Click Save.
+# 11. Click on the Snapper tab.
+# 12. Click New.
+# 13. Enter "***Fresh Install***" in Description field.
+# 14. Click OK.
+cd ~/Downloads/
+git clone https://github.com/Antynea/grub-btrfs
+cd grub-btrfs
+sed -i '/#GRUB_BTRFS_SNAPSHOT_KERNEL/a GRUB_BTRFS_SNAPSHOT_KERNEL_PARAMETERS="systemd.volatile=state"' config
+sed -i '/#GRUB_BTRFS_GRUB_DIRNAME/a GRUB_BTRFS_GRUB_DIRNAME="/boot/grub2"' config
+sed -i '/#GRUB_BTRFS_MKCONFIG=/a GRUB_BTRFS_MKCONFIG=/sbin/grub2-mkconfig' config
+sed -i '/#GRUB_BTRFS_SCRIPT_CHECK=/a GRUB_BTRFS_SCRIPT_CHECK=grub2-script-check' config
+sudo make install
+sudo grub2-mkconfig -o /boot/grub2/grub.cfg
+sudo systemctl enable --now grub-btrfsd.service
