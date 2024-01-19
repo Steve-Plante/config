@@ -1,6 +1,7 @@
 #!/usr/bin/bash -x
 
-# run after archinstall with btrfs subvolumes installed
+# run after archinstall with btrfs subvolumes installed.
+# Install paru from https://github.com/Morganamilo/paru
 
 paru -S snapper-support
 sudo umount /.snapshots
@@ -10,10 +11,10 @@ sudo btrfs subvol list /
 sudo btrfs subvol delete /.snapshots
 sudo mkdir /.snapshots
 sudo mount -a
-sudo btrfs subvol get default /
+sudo btrfs subvol get-default /
 sudo btrfs subvol set-def 256 /
 sudo btrfs subvol list /
-sudo cp -p /etc/snapper/configs/roots /etc/snapper/configs/roots.bak
+sudo cp -p /etc/snapper/configs/root /etc/snapper/configs/root.bak
 sudo sed -i \
 -e 's/ALLOW_GROUPS=""/ALLOW_GROUPS="wheel"/' \
 -e 's/TIMELINE_CREATE="yes"/TIMELINE_CREATE="no"/' \
@@ -21,6 +22,7 @@ sudo sed -i \
 -e 's/TIMELINE_LIMIT_DAILY="10"/TIMELINE_LIMIT_DAILY="5"/' \
 -e 's/TIMELINE_LIMIT_MONTHLY="10"/TIMELINE_LIMIT_MONTHLY="0"/' \
 -e 's/TIMELINE_LIMIT_YEARLY="10"/TIMELINE_LIMIT_YEARLY="0"/' \
- /etc/snapper/configs/roots
+ /etc/snapper/configs/root
 sudo chown -R :wheel /.snapshots
 sudo snapper -c root create -d "***System Installed***"
+sudo grub-mkconfig -o /boot/grub/grub.cfg
