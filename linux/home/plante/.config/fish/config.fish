@@ -2,26 +2,29 @@ if status is-interactive
 
     # Commands to run in interactive sessions can go here
 
-    #function exiftool
-    #   /usr/local/bin/Image-ExifTool-12.40/exiftool
-    #end
-
-    function hist
-       history --show-time="%Y-%m-%d %H:%M:%S " --reverse
-    end
-
-    function neovim
-       echo "Did you mean nvim?"
-    end
+    alias hist="history --show-time='%Y-%m-%d %H:%M:%S'"
+    alias neovim="echo 'Did you mean nvim?'"
+    alias sudo="sudo -E"
+    alias sudo-rs="sudo-rs -i"
 
     # Append to PATH # (does not work under fish version 3.1)
 
     fish_add_path --path /usr/sbin
     fish_add_path --path ~/.local/bin
+    fish_add_path --path ~/.cargo/bin
+
+    # uncomment if cargo installed via https://sh.rustup.rs
+    #function fd
+    #   /usr/lib/cargo/bin/fd
+    #end
 
     # Define extra
     set -U XDG_CONFIG_HOME "$HOME/.config"
-    
+    set -gx VISUAL /usr/bin/nvim
+    set -gx EDITOR /usr/bin/nvim 
+
     echo "custom config.fish executed..."
 
 end
+
+#if test -f /home/plante/.tbmk/.fish; source /home/plante/.tbmk/.fish; end
