@@ -93,7 +93,7 @@ done
 
 # 4. Install and Configure Snapper
 
-sudo dnf install snapper libdnf5-plugin-actions
+sudo dnf install snapper libdnf5-plugin-actions # btrfs-progs if not Fedora 41+
 
 sudo bash -c "cat > /etc/dnf/libdnf5-plugins/actions.d/snapper.actions" <<'EOF'
 # Get snapshot description
