@@ -4,7 +4,6 @@ if status is-interactive
 
     alias hist="history --show-time='%Y-%m-%d %H:%M:%S'"
     alias neovim="echo 'Did you mean nvim?'"
-    alias sudo-rs="sudo-rs -i"
 
     # Append to PATH # (does not work under fish version 3.1)
 
