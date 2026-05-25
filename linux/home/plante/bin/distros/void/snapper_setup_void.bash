@@ -1,26 +1,71 @@
-#!/bin/bash
+#!/bin/bash -x
+
+# To do list:
+#------------
+# 1. Implement zswap into script
+
+TGTDSK="/dev/sda"
+
+pause() {
+    # Pause until enter key is pressed
+    read -p "Press [Enter] key to continue..."
+}
 
 echo "Run as $USER"
 
-# 2. Install Fedora Workstation 41
+# 1. Install Void from .iso
 
-sudo grub2-editenv - unset menu_auto_hide
+# Display disk
+lsblk -f $TGTDSK
+pause
 
-sudo btrfs filesystem label / FEDORA
+# Wipe the disk and create a fresh GPT layout
+sudo sgdisk -Z $TGTDSK
+pause
+# Create a new empty GPT
+sudo sgdisk -og $TGTDSK
+pause
 
-lsblk -p /dev/vda
+# Create 1st partition starting at beginning of disk for a size
+# of one GB and with a type of "EFI system partition"
+sudo sgdisk -n 1:0:+1G -t 1:ef00 $TGTDSK
+pause
+
+# Create 2nd partition for the remaining size and with a type of
+# "Linux filesystem"
+sudo sgdisk -n 2:: -t 2:8300 $TGTDSK
+pause
+
+# print parition table for $TGTDSK
+sudo sgdisk -p /dev/sda
+pause
+
+# Format 1st partition as FAT32
+sudo mkfs.vfat -F32 -n EFI ${TGTDSK}1
+pause
+
+# Format 2nd partition as BTRFS
+sudo mkfs.btrfs -L VOID ${TGTDSK}2
+pause
 
 sudo btrfs subvolume list /
+pause
 
-sudo dnf install vim git inotify-tools make
+sudo xbps-install -Su
+pause
 
-sudo dnf update
+sudo xbps-install -S vim git inotify-tools make
+pause
 
-sudo reboot
+# sudo reboot?
 
-# 3. Create the Additional Subvolumes
+# 2. Create the Additional Subvolumes
 
-sudo mkdir -vp /var/lib/libvirt
+# Mount the Btrfs root
+
+mount -v ${TGTDSK}2 /mnt
+
+sudo mkdir -vp /mnt/var/lib/libvirt
 
 ROOT_UUID="$(sudo grub2-probe --target=fs_uuid /)" ; echo $ROOT_UUID
 
@@ -49,8 +94,11 @@ SUBVOLUMES=(
 )
 
 printf '%s\n' "${SUBVOLUMES[@]}"
+pause
 
 MAX_LEN="$(printf '/%s\n' "${SUBVOLUMES[@]}" | wc -L)" ; echo $MAX_LEN
+
+sudo btrfs subvolume create /mnt/@ # Root filesystem
 
 for dir in "${SUBVOLUMES[@]}" ; do
     if [[ -d "/${dir}" ]] ; then
@@ -60,7 +108,6 @@ for dir in "${SUBVOLUMES[@]}" ; do
     else
         sudo btrfs subvolume create "/${dir}"
     fi
-    sudo restorecon -RF "/${dir}"
     printf "%-41s %-${MAX_LEN}s %-5s %-s %-s\n" \
         "UUID=${ROOT_UUID}" \
         "/${dir}" \
@@ -69,31 +116,37 @@ for dir in "${SUBVOLUMES[@]}" ; do
         "0 0" | \
         sudo tee -a /etc/fstab
 done
+pause
 
 sudo chown -cR $USER:$USER ~/$(ls -A)
-sudo restorecon -vRF ~/$(ls -A)
+pause
 
-sudo chmod -vR 0700 ~/.ssh
+sudo chmod -R 0700 ~/.ssh
+pause
 
 cat /etc/fstab
+pause
 
-sudo systemctl daemon-reload
-
-sudo mount -va
+sudo mount -a
+pause
 
 sudo btrfs subvolume list /
+pause
 
-lsblk -p /dev/vda
+lsblk -p $TGTDSK
+pause
 
 for dir in "${SUBVOLUMES[@]}" ; do
     if [[ -d "/${dir}-old" ]] ; then
-        sudo rm -rvf "/${dir}-old"
+        sudo rm -rf "/${dir}-old"
     fi
 done
+pause
 
-# 4. Install and Configure Snapper
+# 3. Install and Configure Snapper
 
-sudo dnf install snapper libdnf5-plugin-actions # btrfs-progs if not Fedora 41+
+sudo dnf install snapper btrfs-progs # replace btrfs-progs with libdnf5-plugin-actions if Fedora 41+
+pause
 
 sudo bash -c "cat > /etc/dnf/libdnf5-plugins/actions.d/snapper.actions" <<'EOF'
 # Get snapshot description
@@ -105,14 +158,18 @@ pre_transaction::::/usr/bin/sh -c echo\ "tmp.snapper_pre_number=$(snapper\ creat
 # If the variable "tmp.snapper_pre_number" exists, it creates post snapshot after the transaction and removes the variable "tmp.snapper_pre_number".
 post_transaction::::/usr/bin/sh -c [\ -n\ "${tmp.snapper_pre_number}"\ ]\ &&\ snapper\ create\ -t\ post\ --pre-number\ "${tmp.snapper_pre_number}"\ -c\ number\ -d\ "${tmp.cmd}"\ ;\ echo\ tmp.snapper_pre_number\ ;\ echo\ tmp.cmd
 EOF
+pause
 
 sudo snapper -c root create-config /
 sudo snapper -c home create-config /home
+pause
 
 sudo snapper list-configs
+pause
 
 sudo snapper -c root set-config ALLOW_USERS=$USER SYNC_ACL=yes
 sudo snapper -c home set-config ALLOW_USERS=$USER SYNC_ACL=yes
+pause
 
 ROOT_UUID="$(sudo grub2-probe --target=fs_uuid /)"
 
@@ -131,32 +188,35 @@ for dir in '.snapshots' 'home/.snapshots' ; do
         "0 0" | \
         sudo tee -a /etc/fstab
 done
+pause
 
 cat /etc/fstab
+pause
 
-sudo systemctl daemon-reload
-sudo mount -va
+sudo mount -a
+pause
 
 sudo btrfs subvolume list /
+pause
 
 echo 'PRUNENAMES = ".snapshots"' | sudo tee -a /etc/updatedb.conf
 
 echo 'SUSE_BTRFS_SNAPSHOT_BOOTING="true"' | sudo tee -a /etc/default/grub
 
 sudo sed -i.bkp1 '1i set btrfs_relative_path="yes"' /boot/efi/EFI/fedora/grub.cfg
+pause
 
 sudo grub2-mkconfig -o /boot/grub2/grub.cfg
+pause
 
 snapper ls
-
 snapper -c home ls
+pause
 
-# 5. Install and Configure Grub-Btrfs
+# 4. Install and Configure Grub-Btrfs
 
 git clone https://github.com/Antynea/grub-btrfs
-
 cd grub-btrfs
-
 sed -i.bkp \
 -e '/#GRUB_BTRFS_SNAPSHOT_KERNEL_PARAMETERS/a \
 GRUB_BTRFS_SNAPSHOT_KERNEL_PARAMETERS="systemd.volatile=state"' \
@@ -167,16 +227,17 @@ GRUB_BTRFS_MKCONFIG=/usr/sbin/grub2-mkconfig' \
 -e '/#GRUB_BTRFS_SCRIPT_CHECK=/a \
 GRUB_BTRFS_SCRIPT_CHECK=grub2-script-check' \
 config
-
 sudo make install
+pause
 
 sudo grub2-mkconfig -o /boot/grub2/grub.cfg
-sudo systemctl enable --now grub-btrfsd.service
+#sudo systemctl enable --now grub-btrfsd.service
+pause
 
 cd ..
 rm -rvf grub-btrfs
 
-# 6. Create a System Root Snapshot and Set It as the Default
+# 5. Create a System Root Snapshot and Set It as the Default
 
 sudo mkdir -v /.snapshots/1
 
@@ -209,12 +270,12 @@ snapper ls
 # 7. Enable Automatic Timeline Snapshots
 
 sudo snapper -c home set-config TIMELINE_CREATE=no
-sudo systemctl enable --now snapper-timeline.timer
-sudo systemctl enable --now snapper-cleanup.timer
+#sudo systemctl enable --now snapper-timeline.timer
+#sudo systemctl enable --now snapper-cleanup.timer
 
 snapper ls
 
-sudo systemctl disable --now snapper-timeline.timer
-sudo systemctl disable --now snapper-cleanup.timer
+#sudo systemctl disable --now snapper-timeline.timer
+#sudo systemctl disable --now snapper-cleanup.timer
 
-# The end
+# 6. The end

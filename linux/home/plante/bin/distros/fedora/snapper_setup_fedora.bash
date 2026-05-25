@@ -1,3 +1,4 @@
+#!/bin/bash
 # run after Fedora installation with btrfs subvolumes installed
 sudo nano /etc/dnf/dnf.conf # and add to end of the file ...
 max_parallel_downloads=10
