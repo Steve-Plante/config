@@ -65,6 +65,7 @@ pause
 
 # Flake.nix
 cat << EOF > flake.nix
+{
   description = "NixOS";
 
   inputs = {
