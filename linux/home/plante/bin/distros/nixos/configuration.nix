@@ -1,136 +1,7 @@
-#!/bin/bash -x
+# Edit this configuration file to define what should be installed on
+# your system.  Help is available in the configuration.nix(5) man page
+# and in the NixOS manual (accessible by running ‘nixos-help’).
 
-# Fix/To do list:
-#----------------
-# 1.
-
-TGTDSK="/dev/vda"
-
-pause() {
-    # Pause until enter key is pressed
-    read -p "Press [Enter] key to continue..."
-}
-
-# 1. Boot and install from nixos-minimal-dd.mm.9999.a00000000000-x86_64-linux.iso
-
-echo "Run as root"
-sudo -i
-
-# Display disk
-lsblk $TGTDSK
-pause
-
-# Wipe the disk and create a fresh GPT layout
-parted $TGTDSK -- mklabel gpt
-
-# Create 1st partition starting at beginning of disk for a size
-# of one percent and with a type of "EFI system partition"
-parted $TGTDSK -- mkpart primary fat32 0% 1%
-pause
-
-# Create 2nd partition for the remaining size and with a type of
-# "Linux filesystem"
-parted $TGTDSK -- mkpart primary ext4 1% 100%
-pause
-
-# print parition table for $TGTDSK
-parted $TGTDSK print
-pause
-
-# Format 1st partition as FAT32
-sudo mkfs.vfat -F32 -n EFI ${TGTDSK}1
-pause
-
-# Format 2nd partition as ext4
-sudo mkfs.ext4 -L NIXOS ${TGTDSK}2
-pause
-
-# Mount the fat32 boot
-mount --mkdir ${TGTDSK}1 /mnt/boot
-pause
-
-# Mount the ext4 root
-mount ${TGTDSK}2 /mnt
-pause
-
-# Display disk
-lsblk $TGTDSK
-pause
-
-# Configure the nix filesystem
-nixos-generate-config --root /mnt
-cd /mnt/etc/nixos/
-#touch flake.nix home.nix
-pause
-
-# Flake.nix
-cat << EOF > flake.nix
-{
-  description = "NixOS";
-
-  inputs = {
-    nixpkgs.url = "nixpkgs/nixos-26.05";
-    home-manager = {
-      url = "github:nix-community/home-manager/release-26.05";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
-  };
-
-  outputs = { self, nixpkgs, home-manager, ... }: {
-    nixosConfigurations.nixos = nixpkgs.lib.nixosSystem {
-      system = "x86_64-linux";
-      modules = [
-        ./configuration.nix
-        home-manager.nixosModules.home-manager
-        {
-          home-manager = {
-            useGlobalPkgs = true;
-            useUserPackages = true;
-            users.plante = import ./home.nix;
-            backupFileExtension = "backup";
-          };
-        }
-      ];
-    };
-  };
-}
-EOF
-pause
-
-# hardware-configuration.nix
-cat << EOF >> hardware-configuration.nix
-{ config, lib, pkgs, modulesPath, ... }:
-
-{
-  imports =
-    [ (modulesPath + "/profiles/qemu-guest.nix")
-    ];
-
-  boot.initrd.availableKernelModules = [ "ahci" "xhci_pci" "virtio_pci" "sr_mod" "virtio_blk" ];
-  boot.initrd.kernelModules = [ ];
-  boot.kernelModules = [ "kvm-amd" ];
-  boot.extraModulePackages = [ ];
-
-  fileSystems."/" =
-    { device = "/dev/disk/by-uuid/7a26c6bd-c173-4fa7-84c6-439ce67d2f7e";
-      fsType = "ext4";
-    };
-
-  fileSystems."/boot" =
-    { device = "/dev/disk/by-uuid/F1FB-9BAC";
-      fsType = "vfat";
-      options = [ "fmask=0077" "dmask=0077" ];
-    };
-
-  swapDevices = [ ];
-
-  nixpkgs.hostPlatform = lib.mkDefault "x86_64-linux";
-}
-EOF
-pause
-
-# Configuration.nix
-cat << EOF > configuration.nix
 { config, pkgs, ... }:
 
 {
@@ -143,7 +14,7 @@ cat << EOF > configuration.nix
   boot.loader.systemd-boot.enable = true;
   boot.loader.efi.canTouchEfiVariables = true;
 
-  networking.hostName = "nixos"; # Define your hostname.
+  networking.hostName = "nixos1"; # Define your hostname.
   # networking.wireless.enable = true;  # Enables wireless support via wpa_supplicant.
 
   # Configure network proxy if necessary
@@ -265,18 +136,3 @@ cat << EOF > configuration.nix
   system.stateVersion = "26.05"; # Did you read the comment?
 
 }
-EOF
-pause
-
-# Install
-nixos-install --flake /mnt/etc/nixos#nixos
-pause
-
-# Type your password
-nixos-enter --root /mnt -c 'passwd plante'
-pause
-
-# Reboot
-reboot
-
-exit
